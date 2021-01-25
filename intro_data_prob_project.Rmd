@@ -1,0 +1,594 @@
+---
+title: "Exploring the BRFSS data"
+output: 
+  html_document: 
+    fig_height: 4
+    highlight: pygments
+    theme: spacelab
+---
+
+## Setup
+
+### Load packages
+
+```{r load-packages, message = FALSE}
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(viridis)
+library(hrbrthemes)
+library(ggthemes)
+```
+
+### Load data
+
+```{r load-data}
+load("brfss2013.RData")
+```
+
+
+
+* * *
+
+## Part 1: Data
+  This data came from a surveillance system called "Behavioral Risk Factor Surveillance System (BRFSS) that calls each and every correspondent to answer a quick survey by telephone or cellular phones. This survey is used to measure behavior risk factors of adults (18 years old and above) residing in USA (including the District of Columbia, Puerto Rico, Guam, and the US Virgin Islands). The survey's objective is to collect data from people in order to understand the connection between chronic diseases with risk factors that are associated with said disease. As stated by the BRFSS website,"In 2013, the factors assessed by the BRFSS are of the following:tobacco use, HIV/AIDS knowledge and prevention, exercise, immunization, health status, healthy days — health-related quality of life, health care access, inadequate sleep, hypertension awareness, cholesterol awareness, chronic health conditions, alcohol consumption, fruits and vegetables consumption, arthritis burden, and seatbelt use."
+  
+  The data is separated into two categories, surveys coming from telephones and surveys coming from cellular phones. With regards to telephone surveys, the data collected came from a random adult residing in a household. On the other hand, the data collected from cellular phone surveys mostly reside in private residences or in college housing.
+  
+  Since surveys were conducted through telephones or cellular phones, there will be some data that will be missing, making the data presented more likely to be incomplete. Thus, we may, most likely, need to do some data cleaning with the data table before going through the data and analyze the information inside the data table. 
+  
+* * *
+
+## Part 2: Research questions
+
+### **Research question 1:**
+
+#### Does the income you receive has to do with the education you attained? 
+Education in the US is becoming more expensive. One study shows that Americans spend a lot of money to give children their education [1]. At the same time, companies are searching for more college graduates. It states that people with at least a bachelor's degree may have an increase in salary [2]. In this research, the researcher will try to find out whether the study is true or not. Also, the researcher will try and calculate the probability of a participant gaining a certain amount of income through their educational attainment
+
+[1] Source: [The Atlantic](https://www.theatlantic.com/education/archive/2013/12/american-schools-vs-the-world-expensive-unequal-bad-at-math/281983/)
+
+[2] Source: [Association of Public and Land Grant Universities](https://www.aplu.org/projects-and-initiatives/college-costs-tuition-and-financial-aid/publicuvalues/employment-earnings.html#:~:text=College%2Deducated%20workers%20enjoy%20a,is%20a%20high%20school%20diploma.&text=The%20earnings%20gap%20between%20college,less%20education%20continues%20to%20widen.)
+
+### **Research question 2:**
+
+#### Can the participant's vegable intake and amount of exercise predict the probability of a participant having high cholesterol?
+High cholesterol is defined as a person having a high concentration of fat found in the arteries. One type of high cholesterol disease is "hypercholesterolemia" meaning that there are too many bad cholesterol in the body. This may lead to increases fatty blockages, leading to blockages in the arteries [1]. Some factors (including a proper diet and exercise) may affect the amount of cholesterol inside the body [2]. With this in mind, this study aims to know the probability of not having hypercholesterolemia through exercise and vegetable intake.
+
+[1] Source: [American Heart Association](https://www.heart.org/en/health-topics/cholesterol/prevention-and-treatment-of-high-cholesterol-hyperlipidemia#:~:text=Hyperlipidemia%20means%20your%20blood%20has,and%20the%20risk%20of%20blockages.)
+
+[2] Source: [Mayo Clinic](https://www.mayoclinic.org/diseases-conditions/high-blood-cholesterol/symptoms-causes/syc-20350800)
+
+
+### **Research question 3:**
+
+#### Which state and which race has the most number of participants having proper health care coverage?
+
+Health care coverage is defined as a health insurance that meets the requirements of the Affordable Health Act [1]. With that in mind, there are cases where some ethnic groups do not receive any kind of health care coverage. There are research papers that state that some races do not receive any form of health insurance [2]. This research paper will try and look if there are any states that has the highest possibility of getting health insurance.
+
+[1] Source: [HealthCare.gov](https://www.healthcare.gov/glossary/qualifying-health-coverage/)
+
+[2] Source: [Statista](https://www.statista.com/statistics/200970/percentage-of-americans-without-health-insurance-by-race-ethnicity/)
+
+* * *
+
+## Part 3: Exploratory data analysis
+
+### **Research question 1:**
+
+### Does the income you receive has to do with the education you attained? 
+
+#### Data Wrangling and Extraction
+
+First, the researcher will extract the data from the database by creating a subset.
+
+```{r education2013-subset}
+education2013 <- brfss2013 %>%
+  select(educa, income2)
+```
+
+
+The researcher will first check whether there are empty cells or not.
+
+```{r education-with-na}
+education2013 %>%
+    summarize_all(funs(sum(is.na(.))))
+```
+The researcher sees that there are empty cells in both the education and income columns. Because of that, he starts to filter out results that are not of empty cells.
+ 
+```{r filter-education2013}
+education2013 <- education2013 %>%
+  filter(!(is.na(educa))) %>%
+  filter(!(is.na(income2)))
+```
+
+Finally, the researcher checks if everything is valid.
+
+```{r education2013-without-na}
+education2013 %>%
+  select(everything()) %>%
+  summarize_all(funs(sum(is.na(.))))
+```
+Once the researcher is satisfied with the clean up, he will then analyze the subset, taking note that the data remaining is about 85.37% of the data from the main dataset.
+
+#### Data Analysis
+
+The researcher starts by analyzing the data by comparing the amount of people with education and their income levels.
+
+```{r fig.width=10, fig.height=5}
+proportion <- education2013 %>%
+  group_by(educa, income2) %>%
+  count(income2)
+
+ggplot(proportion, mapping = aes(x = n, y = income2, fill = educa)) +
+  geom_bar(position = "stack", size = 4, width = 0.5, stat = "identity") +
+  theme(legend.position = c(.99, .03), legend.justification = c("right", "bottom"), legend.box.just = "right", legend.margin = margin(6, 6, 6, 6), plot.title = element_text(hjust = 0.5)) +
+  guides(fill=guide_legend(title="Educational Attainment")) +
+  scale_fill_viridis(discrete = T) +
+  ggtitle("Incomes of People with Different Educational Attainment") +
+  xlab("Number of Participants") +
+  ylab("Income of Participants")
+```
+
+Once the researcher finishes the creation of the bar plot, he realizes that there is a steady increase of people earning money no matter what education you may take. Though, there are more college graduates that earn more than $75,000 (greater than other educational attainment).
+
+Upon closer inspection...
+
+```{r participants-income-levels}
+proportion <- education2013 %>%
+  group_by(income2)%>%
+  count(income2)
+
+proportion
+```
+
+There are at least 115,810 people who earn $75,000 or more. The researcher found out that college graduates make up about 63.73% of this demographic, bigger than all other educational attainment combined. This may lead to a clue that the amount of income received may be affected by the participant's educational attainment. The researcher looks at the graph once more and see what patterns can he find.
+
+The researcher realizes that as we go up the income threshold, that the number of people without diploma goes down, meaning that the rate of people having a high income and having no educational background is possible, but difficult.
+
+On the other hand, once we go to the third educational attainment (Grades 12 or GED), it seems that there is a pattern regards to income. There is a possibility that they can fall between $35,000 and $50,000. It seems that after High School, people may look for jobs, though it will not give them more income, compared to a technical school graduate, or a college school graduate.
+
+With this in mind, we can now calculate the probability of each educational attainment in a certain threshold of income.
+
+##### 1.a Probability of each income threshold for participants who never had any educational attainment:
+
+```{r probability-no-education}
+probability <- education2013 %>%
+  filter(educa == "Never attended school or only kindergarten") %>%
+  group_by(income2) %>%
+  count(income2)
+
+probability$percentage <- round((probability$n / sum(probability$n)) * 100, digits = 2)
+
+probability <- probability %>%
+  select(income2, percentage)
+
+probability
+```
+
+##### 1.b Probability of each income threshold for participants who graduated elementary:
+
+```{r probability-grade-school}
+probability <- education2013 %>%
+  filter(educa == "Grades 1 through 8 (Elementary)") %>%
+  group_by(income2) %>%
+  count(income2)
+
+probability$percentage <- round((probability$n / sum(probability$n)) * 100, digits = 2)
+
+probability <- probability %>%
+  select(income2, percentage)
+
+probability
+
+```
+
+##### 1.c Probability of each income threshold for participants who graduated middle school:
+
+```{r probability-high-school}
+probability <- education2013 %>%
+  filter(educa == "Grades 9 though 11 (Some high school)") %>%
+  group_by(income2) %>%
+  count(income2)
+
+probability$percentage <- round((probability$n / sum(probability$n)) * 100, digits = 2)
+
+probability <- probability %>%
+  select(income2, percentage)
+
+probability
+
+```
+
+##### 1.d Probability of each income threshold for participants who graduated high school:
+
+```{r probability-high-school-graduate}
+probability <- education2013 %>%
+  filter(educa == "Grade 12 or GED (High school graduate)") %>%
+  group_by(income2) %>%
+  count(income2)
+
+probability$percentage <- round((probability$n / sum(probability$n)) * 100, digits = 2)
+
+probability <- probability %>%
+  select(income2, percentage)
+
+probability
+```
+
+##### 1.e Probability of each income threshold for participants who graduated technical school:
+
+```{r probability-technical-school}
+probability <- education2013 %>%
+  filter(educa == "College 1 year to 3 years (Some college or technical school)") %>%
+  group_by(income2) %>%
+  count(income2)
+
+probability$percentage <- round((probability$n / sum(probability$n)) * 100, digits = 2)
+
+probability <- probability %>%
+  select(income2, percentage)
+
+probability
+```
+
+##### 1.f Probability of each income threshold for participants who graduated college:
+
+```{r probability-college}
+probability <- education2013 %>%
+  filter(educa == "College 4 years or more (College graduate)") %>%
+  group_by(income2) %>%
+  count(income2)
+
+probability$percentage <- round((probability$n / sum(probability$n)) * 100, digits = 2)
+
+probability <- probability %>%
+  select(income2, percentage)
+
+probability
+```
+
+#### Conclusion
+
+From the percentages above, the researcher believes that the probabilities above really speaks about the educational attainment of the participants together with their income, finally concluding that education may affect income. Though, the research takes note that this may not be accurate since there are no specific age to the survey itself.
+
+He will also delete the tables so that the program itself can save memory.
+
+```{r remove-education2013}
+rm(education2013)
+
+rm(probability)
+
+rm(proportion)
+```
+
+
+### **Research question 2:**
+
+### Can the participant's vegable intake and amount of exercise predict the probability of a participant having high cholesterol?
+
+#### Data Wrangling and Extraction
+
+Same as the first question, the researcher will be extracting data from the main dataframe to make it manageable.
+
+```{r health2013-subset}
+health2013 <- brfss2013 %>%
+  select(X_totinda, vegeda1_, X_rfchol, X_veg23)
+```
+
+Then, he will be checking if there are any missing values in the table.
+
+```{r health2013-with-na}
+health2013 %>%
+  select(everything()) %>%
+  summarize_all(funs(sum(is.na(.))))
+```
+Once he finds all the missing values, he will now delete most of the empty values.
+
+```{r filter-health2013}
+health2013 <-health2013 %>%
+  filter(!(is.na(X_totinda))) %>%
+  filter(!(is.na(vegeda1_))) %>%
+  filter(!(is.na(X_rfchol))) %>%
+  filter(!(is.na(X_veg23)))
+```
+
+Finally, the researcher will check whether there are empty vales or not.
+
+```{r health2013-without-na}
+health2013 %>%
+  select(everything()) %>%
+  summarize_all(funs(sum(is.na(.))))
+```
+
+Once confirmed, the researcher will be checking the validity of the column "vegeda1_" by using the column "X_veg23".
+
+```{r acceptable-values}
+health2013 <-health2013 %>%
+  filter(X_veg23 == "Included - values are in accepted range")
+```
+
+Once the researcher filters the data on hand, he will be moving on to data analysis, taking note that the data retained is about 78.60% of the data.
+
+#### Data Analysis
+
+Now, the researcher would like to see if there is a relationship between exercise, vegetable intake, and high cholesterol altogether. 
+
+With this in mind, he starts to look at the vegetable consumption of people who have high cholesterol. But first, he starts looking for outliers in the data.
+
+```{r outliers1}
+health1 <- health2013 %>%
+  group_by(vegeda1_, X_totinda, X_rfchol) %>%
+  count(X_rfchol)
+
+health2 <- health1 %>%
+  filter(X_rfchol == "Yes")
+  
+ggplot(health2, aes(x = vegeda1_, y = n)) +
+  geom_point() +
+  geom_text(label = rownames(health2), nudge_x = 0.25, nudge_y = 0.25, check_overlap = T) +
+  ggtitle("Outliers of Data") +
+  xlab("Vegetable Consumption") +
+  ylab("No. of Participants") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+The researcher, as seen above, can see that there are several outliers if the row "vegeda1_" is greater than or equal to 2000. With that in mind, the researcher chooses to delete the data, then make the following histogram with the limit.
+
+```{r histogram1}
+health2 <- health2 %>%
+  filter(X_rfchol == "Yes") %>%
+  filter(vegeda1_ < 2000)
+
+health21 <- health2 %>%
+  filter(X_totinda == "Had physical activity or exercise")
+
+health22 <- health2 %>%
+  filter(!(X_totinda == "Had physical activity or exercise"))
+
+ggplot(health21, aes(x=vegeda1_)) + 
+  geom_histogram() +
+  ggtitle("Histogram of Participants Consuming Vegetables (With Exercise)") +
+  xlab("Vegetable Consumption") +
+  ylab("No. of Participants") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+ggplot(health22, aes(x=vegeda1_)) + 
+  geom_histogram() +
+  ggtitle("Histogram of Participants Consuming Vegetables (Without Exercise)") +
+  xlab("Vegetable Consumption") +
+  ylab("No. of Participants") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+health2013 %>%
+  filter(X_rfchol == "Yes") %>%
+  filter(X_totinda == "Had physical activity or exercise") %>%
+  summarize(mean_dd = mean(vegeda1_), sd_dd = sd(vegeda1_), n = n())
+
+health2013 %>%
+  filter(X_rfchol == "Yes") %>%
+  filter(!(X_totinda == "Had physical activity or exercise")) %>%
+  summarize(mean_dd = mean(vegeda1_), sd_dd = sd(vegeda1_), n = n())
+```
+
+The researcher finds it very interesting that the participants, having high cholesterol count, may consume vegetables at most 83.65 times (for those who exercise) and 69.99 times (for those who don't exercise). We know that a healthy diet, paired with exercise, may result with a lower chance of having high cholesterol. though, this is intriguing. Maybe, at the time of the call, some people already knew of their high cholesterol and are trying their best to change their lifestyle. But it's too soon to say any conclusion.
+
+The researcher, with the hypothesis in mind, will be looking at the other half of the data by doing the same steps above.
+
+```{r outliers2}
+health2 <- health1 %>%
+  filter(X_rfchol == "No")
+  
+ggplot(health2, aes(x = vegeda1_, y = n)) +
+  geom_point() +
+  geom_text(label = rownames(health2), nudge_x = 0.25, nudge_y = 0.25, check_overlap = T) +
+  ggtitle("Outliers of Data") +
+  xlab("Vegetable Consumption") +
+  ylab("No. of Participants") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+```{r histogram2}
+health2 <- health2 %>%
+  filter(X_rfchol == "No") %>%
+  filter(vegeda1_ < 2000)
+
+health21 <- health2 %>%
+  filter(X_totinda == "Had physical activity or exercise")
+
+health22 <- health2 %>%
+  filter(!(X_totinda == "Had physical activity or exercise"))
+
+ggplot(health21, aes(x=vegeda1_)) + 
+  geom_histogram() +
+  ggtitle("Histogram of Participants Consuming Vegetables (With Exercise)") +
+  xlab("Vegetable Consumption") +
+  ylab("No. of Participants") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+ggplot(health22, aes(x=vegeda1_)) + 
+  geom_histogram() +
+  ggtitle("Histogram of Participants Consuming Vegetables (Without Exercise)") +
+  xlab("Vegetable Consumption") +
+  ylab("No. of Participants") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+health2013 %>%
+  filter(X_rfchol == "No") %>%
+  filter(X_totinda == "Had physical activity or exercise") %>%
+  summarize(mean_dd = mean(vegeda1_), sd_dd = sd(vegeda1_), n = n())
+
+health2013 %>%
+  filter(X_rfchol == "No") %>%
+  filter(!(X_totinda == "Had physical activity or exercise")) %>%
+  summarize(mean_dd = mean(vegeda1_), sd_dd = sd(vegeda1_), n = n())
+```
+
+The researcher noticed that the mean of both data have similar means for those who exercised (83.65 vs. 87.16) and for those who did not exercise (69.99 vs. 71.30). Their histograms are also similar as their standard deviations are close (64.12 vs. 57.67 vs. 68.17 vs. 59.79).
+
+In the end, the researcher concluded that the histograms are too similar, making the histograms hard to plot probabilities.
+
+#### Conclusion
+In the end, the researcher concludes that there is no possible way that he would know if a participant has high cholesterol using the data itself. This is more likely because more people are conscious about their health. There is a possibility that they are already getting their medications for high cholesterol and changing their lifestyle before the survey, so this data may be a bit rigged. 
+
+Just like what the researcher did earlier, he will delete the subsets created as to not use too much memory.
+```{r remove-health2013}
+rm(health1)
+
+rm(health2)
+
+rm(health21)
+
+rm(health22)
+
+rm(health2013)
+```
+
+
+### **Research question 3:**
+
+### Which state and which race has the most number of participants having proper health care coverage?
+
+#### Data Wrangling and Extraction
+
+Just like earlier, the researcher will extract the data and delete any empty cells inside the data.
+
+```{r insurance2013-subset}
+insurance2013<- brfss2013 %>%
+  select(X_state, X_race, X_hcvu651)
+```
+
+```{r insurance2013-with-na}
+insurance2013 %>%
+    summarize_all(funs(sum(is.na(.))))
+```
+```{r filter-insurance2013}
+insurance2013 <- insurance2013 %>%
+  filter(!(is.na(X_race))) %>%
+  filter(!(is.na(X_hcvu651)))
+```
+
+```{r insurance2013-without-na}
+insurance2013 %>%
+    summarize_all(funs(sum(is.na(.))))
+```
+
+Once the data cleaning has been completed, the researcher will continue on to data analysis, taking note that the data remaining is about 65.12% of the original dataset.
+
+#### Data Analysis
+
+First, the researcher will look what state and the race that has the most insurance. To make data analysis easier for the researcher, he will shorten the data to only the top 10 so that we can see the composition. This side will be separated into three parts.
+
+1. The State with the Most Participants with Health Insurance
+2. The Race with the Most Participants with Health insurance
+3. The Composition of Race Per State with Health Insurance
+4. The Race with the Most Participants Without Health Insurance
+
+##### 3.a The State with the Most Participants with Health Insurance
+
+First, we start with counting how many respondents have health insurance in a state.
+
+```{r fig.width=9}
+insurance <- insurance2013 %>%
+  filter(X_hcvu651 == "Have health care coverage") %>%
+  group_by(X_state, X_hcvu651) %>%
+  count(X_state) %>%
+  arrange(desc(n)) %>%
+  head(n = 10)
+
+ggplot(insurance, mapping = aes(x = X_state, y = n)) +
+  geom_bar(size = 4, width = 0.6, fill = "lightblue", stat = "identity") +
+  geom_text(aes(label = n), position = position_dodge(width = 0.9), vjust = -0.25) +
+  theme(plot.title = element_text(hjust = 0.5), axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+  theme_minimal() +
+  ggtitle("Top 10 States with the Most People with Health insurance") +
+  xlab("States") +
+  ylab("No. of Participants")
+```
+
+The researcher sees that there are a lot of participants being covered by health insurance in Florida.
+
+Next, the researcher will see the most race being ensured by the health coverage.
+
+##### 3.b The Race with the Most Participants with Health insurance
+
+```{r fig.width=9}
+insurance <- insurance2013 %>%
+  filter(X_hcvu651 == "Have health care coverage") %>%
+  group_by(X_race, X_hcvu651) %>%
+  count(X_race) %>%
+  arrange(desc(n))
+
+ggplot(insurance, mapping = aes(x = n, y = X_race)) +
+  geom_bar(size = 4, width = 0.6, fill = "lightblue", stat = "identity") +
+  theme(plot.title = element_text(hjust = 0.5), axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+  ggtitle("Number of races with Health Insurance") +
+  xlab("Race") +
+  ylab("No. of Participants")
+```
+
+The researcher can see that most of the health insurance goes to the "white, non-hispanic" race by a landslide.
+
+Now, the researcher will analyze the composition of races by health insurance.
+
+##### 3.c The Composition of Race Per State with Health Insurance
+
+```{r fig.width=10, fig.height=8}
+insurance <- insurance2013 %>%
+  filter(X_hcvu651 == "Have health care coverage") %>%
+  group_by(X_race, X_state) %>%
+  count(X_state) %>%
+  filter(X_state == "Colorado" | 
+         X_state == "Florida" | 
+         X_state == "Kansas" | 
+         X_state == "Maryland" | 
+         X_state == "Massachusetts" | 
+         X_state == "Michigan" | 
+         X_state == "Minnesota" | 
+         X_state == "Nebraska" | 
+         X_state == "New Jersey" | 
+         X_state == "Utah")
+
+ggplot(insurance, mapping = aes(x = X_state, y = n, fill = X_race)) +
+  geom_bar(position = "stack", size = 4, width = 0.5, stat = "identity") +
+  theme(legend.position = c(.99, .99), legend.justification = c("right", "top"), legend.box.just = "right", legend.margin = margin(6, 6, 6, 6), plot.title = element_text(hjust = 0.5)) +
+  guides(fill=guide_legend(title="Race")) +
+  scale_fill_viridis(discrete = T) +
+  ggtitle("The Composition of Race Per State with Health Insurance") +
+  xlab("State") +
+  ylab("Number of Participants")
+```
+
+The researcher sees that for every state, almost (if not all) all the states have the most majority of "white, non-hispanic" races being insured in health care.
+
+What about the race with the least amount of health insured participants?
+
+##### 3.d The Race with ther Most Participants Without Health Insurance
+
+```{r fig.width=10, fig.height=4}
+insurance <- insurance2013 %>%
+  filter(X_hcvu651 == "Do not have health care coverage") %>%
+  group_by(X_race, X_hcvu651) %>%
+  count(X_race)
+  
+
+ggplot(insurance, mapping = aes(x = n, y = X_race)) +
+  geom_bar(size = 4, width = 0.5, fill = "lightblue", stat = "identity") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  ggtitle("Number of Races Without Health Insurance") +
+  xlab("Number of Participants") +
+  ylab("Race")
+```
+
+The researcher noticed that even those races without any health insurance are still the same top three races that have health insurance. In the end, the researcher understands that health insurance is mostly just a choice between a person and a company. There can be a reason that they did not avail for a health insurance (the cost of insurance, beliefs of a person, and many more).
+
+#### Conclusion
+In the end, the researcher finds out that "white only, non-Hispanic" races are mostly insured by health coverage, but at the same time, the same race do not usually avail for those insurances. In the end, the researcher realizes that people can choose whether they would like for insurances or not.
+
+Finally, just like earlier, the researcher will be deleting the datasets for saving memory.
+
+```{r}
+rm(insurance)
+
+rm(insurance2013)
+```

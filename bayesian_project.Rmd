@@ -1,0 +1,410 @@
+## Setup
+
+### Load packages
+
+```{r load-packages, message = FALSE}
+library(ggplot2)
+library(dplyr)
+library(statsr)
+library(BAS)
+library(gridExtra)
+library(MASS)
+library(tidyverse)
+```
+
+### Load data
+
+```{r load-data}
+load("movies.Rdata")
+predict <- read.csv("predict1.csv")
+```
+
+
+
+* * *
+
+## Part 1: Data
+
+The data was gotten for Rotten Tomatoes and IMDB APIs. Rotten Tomatoes, together with the Tomatometer is one of the most trusted recommendation resources for movies, shows, podcasts, and more. They are usually scoring the movies through critics and audiences. While critics can rate the movies through Rotten Tomatoes before the movie, audience members can rate the movie once it comes out. Usually the audience rates it out of 100, then the Tomatometer can give an average of what the people like and dislike. IMDB operates similarly to Rotten Tomatoes, but instead they rate out of a possible 5 out of 5.The data is mostly movies that are released before 2016.
+
+* * *
+
+## Part 2: Data manipulation
+
+First, we need to look at the table and see if there is anything that we would like to change.
+
+``` {r}
+summary(movies)
+```
+As we can see from the information above, we have about 651 movies categorized into 32 columns. Now, we would like to add in the new variables into the data.
+
+`feature film`: "yes" if title_type is Feature Film, "no" otherwise
+```{r}
+movies <- mutate(movies, feature_film = ifelse(title_type == "Feature Film", "Yes", "No"))
+
+movies$feature_film <- as.factor(movies$feature_film)
+```
+
+`drama`: "yes" if genre is Drama, "no" otherwise
+```{r}
+movies <- mutate(movies, drama = ifelse(genre == "Drama", "Yes", "No"))
+
+movies$drama <- as.factor(movies$drama)
+```
+
+`mpaa_rating_R`: "yes" if mpaa_rating is R, "no" otherwise
+``` {r}
+movies <- mutate(movies, mpaa_rating_R = ifelse(mpaa_rating == "R", "Yes", "No"))
+
+movies$mpaa_rating_R <- as.factor(movies$mpaa_rating_R)
+```
+
+`oscar_season`: "yes" if movie is released in November, October, or December (based on thtr_rel_month), "no" otherwise
+```{r}
+movies <- mutate(movies, oscar_season = ifelse(thtr_rel_month %in% c(10, 11, 12), "Yes", "No"))
+
+movies$oscar_season <- as.factor(movies$feature_film)
+```
+
+`summer_season`: "yes" if movie is released in May, June, July, or August (based on thtr_rel_month), "no" otherwise
+```{r}
+movies <- mutate(movies, summer_season = ifelse(thtr_rel_month %in% c(5, 6, 7, 8), "Yes", "No"))
+
+movies$summer_season <- as.factor(movies$summer_season)
+```
+
+``` {r}
+summary(movies)
+```
+
+Before we explore the data, we shall delete some of the useless variables and also the empty cells inside the dataframe.
+
+``` {r}
+df <- movies %>%
+  dplyr::select("feature_film", "drama", "runtime", "mpaa_rating_R", "thtr_rel_year", "oscar_season","summer_season", "imdb_rating", "imdb_num_votes", "critics_score", "audience_score", "best_pic_nom", "best_pic_win", "best_actor_win", "best_actress_win", "best_dir_win", "top200_box")
+
+df <- na.omit(df)
+
+summary(df)
+glimpse(df)
+```
+
+After deleting "useless" data, we now have a remainder of 17 columns with 650 movies inside the dataframe "df".
+
+We may now move on to exploring the data
+
+* * *
+
+## Part 3: Exploratory data analysis
+
+First, let's see the overview of audience score.
+
+``` {r}
+summary(df$audience_score)
+```
+
+```{r}
+IQR(df$audience_score)
+```
+
+As we can see from above, the audience score has a mean of 62.35 and has a median of 65.00. The IQR of this is about 34.00. Since the median is greater than the mean, we can safely say that the audience score is mostly left-skewed.
+
+``` {r}
+ggplot(df, mapping = aes(x = audience_score, y = ..density..)) +
+  geom_histogram(fill = 'blue', color = 'black') +
+  geom_density(size = 1, color = 'maroon') +
+  labs(x = 'Audience Score', y = 'Density', title = 'Density of Audience Score')
+```
+
+The figure shows that there is a slight left-skew in the data, indicating that there are more movies that are mostly rated high in audience_score.
+
+Let's see how this correlates to the other features of the database.
+
+``` {r fig.height = 10, fig.width = 9}
+f1 <- ggplot(df, mapping = aes(y = audience_score, x = feature_film, fill = feature_film)) +
+  geom_boxplot() +
+  labs(x = "Feature Films", y = "Audience Score", title = "Audience Score vs. Feature Films") +
+  theme_minimal()
+
+f2 <- ggplot(df, mapping = aes(y = audience_score, x = drama, fill = drama)) +
+  geom_boxplot() +
+  labs(x = "Drama", y = "Audience Score", title = "Audience Score vs. Drama") +
+  theme_minimal()
+
+f3 <- ggplot(df, mapping = aes(y = audience_score, x = mpaa_rating_R, fill = mpaa_rating_R)) +
+  geom_boxplot() +
+  labs(x = "MPAA Rating (R)", y = "Audience Score", title = "Audience Score vs. MPAA Rating (R)") +
+  theme_minimal()
+
+f4 <- ggplot(df, mapping = aes(y = audience_score, x = oscar_season, fill = oscar_season)) +
+  geom_boxplot() +
+  labs(x = "Oscar Season", y = "Audience Score", title = "Audience Score vs. Oscar Season") +
+  theme_minimal()
+
+f5 <- ggplot(df, mapping = aes(y = audience_score, x = summer_season, fill = summer_season)) +
+  geom_boxplot() +
+  labs(x = "Summer Season", y = "Audience Score", title = "Audience Score vs. Summer Season") +
+  theme_minimal()
+
+grid.arrange(f1, f2, f3, f4, f5, ncol = 2)
+```
+
+Here are some observations on the boxplot above:
+1. There is an obvious difference between movies that are feature films and films that are not. The mean and the general quartile range is higher when they are not feature films.
+2. Same goes with the Oscar season. We can see from the boxplot above that movies that are not released during Oscar season have a more positive audience score vs those released during Oscar season.
+3. There is a difference with regards with the mean of the variable "Drama" such that more people react more positively if the genre of the movie is Genre vs. other movies.
+
+With regards to MPAA Rating (R) and the summer season variables. They are too close to know which one is higher than the other. To combat this, we may use some functions so that we may know which is higher.
+
+| |Mean of "Yes"|Mean of "No"|
+|-|-------------|------------|
+|Summer Season|61.80769|62.60181|
+|MPAA Rating (R)|62.04255|62.66044|
+
+As we can see from the table above, MPAA Rating (R) has virtually the same average when it comes to audience score. On the other hand, movies that are released before or after the summer season has a higher average than those who do. Though, the numbers are pretty close to one another, so we will take note of this and move on.
+
+We will now be looking at other features present in the dataset "movie".
+
+``` {r fig.height = 30, fig.width = 10}
+d1 <-ggplot(df, mapping = aes(audience_score, fill = feature_film)) +
+  geom_density(alpha=.5) +
+  labs(x = "Feature Film", y = "Density", title = "Audience Score vs. Feature Film")
+
+d2 <-ggplot(df, mapping = aes(audience_score, fill = drama)) +
+  geom_density(alpha=.5) +
+  labs(x = "Drama", y = "Density", title = "Audience Score vs. Drama")
+
+d4 <-ggplot(df, mapping = aes(audience_score, fill = mpaa_rating_R)) +
+  geom_density(alpha=.5) +
+  labs(x = "MPAA Rating (R)", y = "Density", title = "Audience Score vs. MPAA Rating")
+
+d6 <-ggplot(df, mapping = aes(audience_score, fill = oscar_season)) +
+  geom_density(alpha=.5) +
+  labs(x = "Oscar Season", y = "Density", title = "Audience Score vs. Oscar Season")
+
+d7 <-ggplot(df, mapping = aes(audience_score, fill = summer_season)) +
+  geom_density(alpha=.5) +
+  labs(x = "Summer Season", y = "Density", title = "Audience Score vs. Summer Season")
+
+d11 <-ggplot(df, mapping = aes(audience_score, fill = best_pic_nom)) +
+  geom_density(alpha=.5) +
+  labs(x = "Best Pic Nomination", y = "Density", title = "Audience Score vs. Best Pic Nomination")
+
+d12 <-ggplot(df, mapping = aes(audience_score, fill = best_pic_win)) +
+  geom_density(alpha=.5) +
+  labs(x = "Best Pic Winner", y = "Density", title = "Audience Score vs. Best Pic Winner")
+
+d13 <-ggplot(df, mapping = aes(audience_score, fill = best_actor_win)) +
+  geom_density(alpha=.5) +
+  labs(x = "Best Actor Winner", y = "Density", title = "Audience Score vs. Best Actor Winner")
+
+d14 <-ggplot(df, mapping = aes(audience_score, fill = best_actress_win)) +
+  geom_density(alpha=.5) +
+  labs(x = "Best Actress Winner", y = "Density", title = "Audience Score vs. Best Actress Winner")
+
+d15 <-ggplot(df, mapping = aes(audience_score, fill = best_dir_win)) +
+  geom_density(alpha=.5) +
+  labs(x = "Best Director Win", y = "Density", title = "Audience Score vs. Best Director Win")
+
+d16 <-ggplot(df, mapping = aes(audience_score, fill = top200_box)) +
+  geom_density(alpha=.5) +
+  labs(x = "Top 200 Box Office", y = "Density", title = "Audience Score vs. Top 200 Box Office")
+
+grid.arrange(d1, d2, d4, d6, d7, d11, d12, d13, d14, d15, d16, ncol = 1)
+
+```
+
+After looking at the graphs above, we may now look at modeling the data and see what can we use to predict our model correctly.
+
+* * *
+
+## Part 4: Modeling
+
+Firstly, we look at what variables influence the audience score. In order to do that, we should look at the variables passing through the function `bayes_inference`.
+
+``` {r}
+bayes_inference(y = audience_score, x = feature_film, data = df, statistic = 'mean', type = 'ht', null = 0, alternative = 'twosided', prior = "JZS", rscale = 1, method = "theoretical")
+```
+
+``` {r}
+bayes_inference(y = audience_score, x = drama, data = df, statistic = 'mean', type = 'ht', null = 0, alternative = 'twosided', prior = "JZS", rscale = 1, method = "theoretical")
+```
+
+``` {r}
+bayes_inference(y = audience_score, x = mpaa_rating_R, data = df, statistic = 'mean', type = 'ht', null = 0, alternative = 'twosided', prior = "JZS", rscale = 1, method = "theoretical")
+```
+
+``` {r}
+bayes_inference(y = audience_score, x = oscar_season, data = df, statistic = 'mean', type = 'ht', null = 0, alternative = 'twosided', prior = "JZS", rscale = 1, method = "theoretical")
+```
+
+``` {r}
+bayes_inference(y = audience_score, x = summer_season, data = df, statistic = 'mean', type = 'ht', null = 0, alternative = 'twosided', prior = "JZS", rscale = 1, method = "theoretical")
+```
+
+``` {r}
+bayes_inference(y = audience_score, x = best_pic_nom, data = df, statistic = 'mean', type = 'ht', null = 0, alternative = 'twosided', prior = "JZS", rscale = 1, method = "theoretical")
+```
+
+``` {r}
+bayes_inference(y = audience_score, x = best_pic_win, data = df, statistic = 'mean', type = 'ht', null = 0, alternative = 'twosided', prior = "JZS", rscale = 1, method = "theoretical")
+```
+
+``` {r}
+bayes_inference(y = audience_score, x = best_actor_win, data = df, statistic = 'mean', type = 'ht', null = 0, alternative = 'twosided', prior = "JZS", rscale = 1, method = "theoretical")
+```
+
+``` {r}
+bayes_inference(y = audience_score, x = best_actress_win, data = df, statistic = 'mean', type = 'ht', null = 0, alternative = 'twosided', prior = "JZS", rscale = 1, method = "theoretical")
+```
+
+``` {r}
+bayes_inference(y = audience_score, x = best_dir_win, data = df, statistic = 'mean', type = 'ht', null = 0, alternative = 'twosided', prior = "JZS", rscale = 1, method = "theoretical")
+```
+
+``` {r}
+bayes_inference(y = audience_score, x = top200_box, data = df, statistic = 'mean', type = 'ht', null = 0, alternative = 'twosided', prior = "JZS", rscale = 1, method = "theoretical")
+```
+
+We can see from the data above that both the variable `feature_film`, `drama`, `oscar_season`, and `best-pic-nom` have decisive evidence against H1. `mpaa_rating_R`, `summer_season`, `best_pic_win`, and `best_actor_win`have a strong evidence against H1 while `best_actress_win` has substantial evidence against H1. Finally, both `best_dir_win` and `top200_box` has little to no evidence against H1.
+
+With this in mind, we may start making the model of this dataset. First, let's look at the Bayes Information Criterion (BIC) and see if there are variables that may make the BIC lower. If attained, we may use that model to use for predicting audience scores.
+
+``` {r}
+lm_rating <- stepAIC(lm(audience_score ~ ., data = df, direction = "backward", k = log(nrow(df))))
+```
+At last! We find that the variables fitted in the model are:
+. `thtr_rel_year`
+. `best_actor_win`
+. `best_actress_win`
+. `mpaa_rating_R`
+. `best_pic_nom`
+. `runtime`
+. `critics_score`
+. `imdb_rating`
+
+Finally, let's put these variables into a model.
+
+``` {r}
+model <- lm(formula = audience_score ~ thtr_rel_year + best_actor_win + best_actress_win + mpaa_rating_R + best_pic_nom + runtime + critics_score + imdb_rating, data = df)
+
+summary(model)
+```
+
+Before wee move on to the prediction, there are a couple of rules in which we need to go through.
+(i) there is a linear relationship between any numerical variable and the response variable
+(ii) residuals are normally distributed
+(iii) residuals display constant variability
+(iv) residuals are independent
+
+(i) there is a linear relationship between any numerical variable and the response variable
+
+Let's see if there is a linear relationship between `thtr_rel_year`, `runtime`, `critics_score`, `imdb_rating`, and `audience_score`.
+
+``` {r}
+g1 <- ggplot(data=NULL, mapping = aes(x = df$thtr_rel_year, y=model$residuals)) +
+  geom_point() +
+  labs(x = "Theater Release Year", y = "Residuals", title = "Residuals vs. Theater Release Year")
+
+g2 <- ggplot(data=NULL, aes(x=df$runtime, y=model$residuals)) +
+  geom_point() +
+  labs(x = "Runtime", y = "Residuals", title = "Residuals vs. Runtime")
+
+g3 <- ggplot(data=NULL, aes(x=df$critics_score, y=model$residuals)) +
+  geom_point() +
+  labs(x = "Critics Score", y = "Residuals", title = "Residuals vs. Critics Score")
+
+g4 <- ggplot(data=NULL, aes(x=df$imdb_rating, y=model$residuals)) +
+  geom_point()+
+  labs(x = "IMDB Rating", y = "Residuals", title = "Residuals vs. IMDB Rating")
+
+grid.arrange(g1, g2, g3, g4)
+```
+
+The residuals appear to be scattered around 0.
+
+(ii) residuals are normally distributed
+
+``` {r}
+hist(model$residuals)
+qqnorm(model$residuals)
+qqline(model$residuals)
+```
+
+The histogram looks like there is skewness in the data, but once we look at the line graph, we see that there are only minor skewness at the end.
+
+(iii) residuals display constant variability
+
+``` {r}
+v1 <- ggplot(data=NULL, aes(x = model$fitted.values, y = model$residuals)) +
+  geom_point()
+
+v2 <- ggplot(data=NULL, aes(x = model$fitted.values, y = abs(model$residuals))) +
+  geom_point()
+
+grid.arrange(v1, v2)
+```
+
+The grids above show that residuals are variable for low and high values of the predicted values, i.e., residuals have a constant variability.
+
+(iv) residuals are independent
+
+``` {r}
+plot(model$residuals)
+```
+
+The results show that there does not appear to be any structure to the residual values. In addition, the residuals do not show any pattern when plotted as a function of the theater release data (not shown).
+
+Finally, we may move on to the prediction of data.
+
+* * *
+
+## Part 5: Prediction
+
+```{r, echo = FALSE}
+predict <- mutate(predict, feature_film = ifelse(title_type == "Feature Film", "Yes", "No"))
+
+predict$feature_film <- as.factor(predict$feature_film)
+
+predict <- mutate(predict, drama = ifelse(genre == "Drama", "Yes", "No"))
+
+predict$drama <- as.factor(predict$drama)
+
+predict <- mutate(predict, mpaa_rating_R = ifelse(mpaa_rating == "R", "Yes", "No"))
+
+predict$mpaa_rating_R <- as.factor(predict$mpaa_rating_R)
+
+predict <- mutate(predict, oscar_season = ifelse(thtr_rel_month %in% c(10, 11, 12), "Yes", "No"))
+
+predict$oscar_season <- as.factor(predict$feature_film)
+
+predict <- mutate(predict, summer_season = ifelse(thtr_rel_month %in% c(5, 6, 7, 8), "Yes", "No"))
+
+predict$summer_season <- as.factor(predict$summer_season)
+
+predict$best_actor_win <- as.factor(predict$best_actor_win)
+
+predict$best_actress_win <- as.factor(predict$best_actress_win)
+  
+predict$best_pic_nom <- as.factor(predict$best_pic_nom)
+
+predict <- na.omit(predict)
+```
+
+We may now predict the audience scores in the dataframe `predict.csv`
+
+``` {r}
+predict$predictions <- round(predict(model, predict), digits = 0)
+predict$residuals <- abs(predict$audience_score - predict$predictions)
+predict %>% dplyr::select(title, audience_score, predictions, residuals)
+
+summary(predict$residuals)
+```
+
+From the table above, we can see that there is not much of a difference between the predictions and audience score. There is a mean of 4.80 with a median of 4.00. The maximum residual is about 10.00.
+
+* * *
+
+## Part 6: Conclusion
+
+We can say that the model that we made is not that accurate since there are times where some actors and actresses are not nominated in certain award bodies (such as Oscars) but are in others. Movies are also affected by this too, and thus, changing the notion that a certain movie is good or bad. We can also see that there might be biases around the release of a movie by year since most of the movies in the database maybe released from mostly 2016. Also, pleased be advised that data in this might be biased with the number of categories a certain variable has. If we can balance these out, then we may have a more accurate meter of these predictions.

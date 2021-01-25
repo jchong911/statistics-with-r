@@ -1,0 +1,520 @@
+---
+title: "Statistical inference with the GSS data"
+output: 
+  html_document: 
+    fig_height: 4
+    highlight: pygments
+    theme: spacelab
+fig_width: 10
+fig_height: 10
+---
+
+## Setup
+
+### Load packages
+
+```{r load-packages, message = FALSE}
+library(ggplot2)
+library(dplyr)
+library(statsr)
+```
+
+### Load data
+
+Make sure your data and R Markdown files are in the same directory. When loaded
+your data file will be called `gss`. Delete this note when before you submit 
+your work. 
+
+```{r load-data}
+load("gss.Rdata")
+```
+
+
+
+* * *
+
+## Part 1: Data
+
+The General Social Survey is a survey which aims to look at the complexity of the American society and monitors the social characteristics and attitudes of a respondent. It mostly focuses on face-to-face interviews as a mean to get answers for the survey. The questions inside the survey are mostly about demographics, behaviors, and attitudes of Americans. The survey allows researchers to examine the structure made by society itself and the character portrayed by citizens in each subgroups.
+
+* * *
+
+## Part 2: Research question
+
+This research paper will try to dissect whether people of different classes and educational attainment correlate to the probability of them being more “pro-life” or “pro-choice” regarding the scenarios listed down in the survey.
+
+Abortion, as stated by Medicine Plus, is a procedure to end a pregnancy by removing the fetus from the womb of a woman before the fetus can maintain itself in the womb (at most at the 20th week of gestation). Abortion has two processes: medicinal and surgical ^[1]^. The difference between the two is that medicinal abortion uses medicine to remove the fetus and placenta from the uterus ^[2]^. In contrast, surgical abortion uses different equipment to remove the contents inside the womb ^[3]^.
+
+Abortion itself is a sensitive topic to people as there are different opinions concerning this process. Some people would choose to keep the fetus rather than abort them. These are what we call “pro-life” people. One of the reasons why people choose to be “pro-life” is that they think that a fertilized egg, no matter what, is still a human. As such, “pro-life” people may think that the fertilized egg must be included in human rights, thus not subjected to murderer ^[4]^.
+
+On the other hand, people who are not against abortion are called” pro-choice.” One of the reasons why people want to be “pro-choice” is that they believe women should have a choice whether they can do the operation or not. Being “pro-choice” means that women can choose whether they can care for the children or not, making them more equal to men. They also believe that a woman who is forced to have a child is not ideal ^[5]^.
+
+The research paper aims to know what is their stand on abortion for every scenario that the survey has. Studies have shown that higher educational attainment relates to people being more “pro-choice.” The research paper stated that since people with higher educational attainment are more aware of their choices available to them, then they are more inclined to be more “pro-choice” than “pro-life” ^[6]^. Because of this, this research paper seeks to learn whether there are different probabilities of a person changing their stance when faced with different scenarios and different educational attainment.
+
+
+[1] Source: [Medicine Plus](https://medlineplus.gov/abortion.html#cat_76)
+
+[2] Source: [Medicine Plus: Medicinal Abortion](https://medlineplus.gov/ency/article/007382.htm)
+
+[3] Source: [Medicine Plus: Surgical Abortion](https://medlineplus.gov/ency/article/002912.htm)
+
+[4] Source: [Minnesota Citizens Concerned for Life](https://www.mccl.org/whyprolife)
+
+[5] Source: [MIT Pro-Choice](http://web.mit.edu/pro-choice/www/reasons.html)
+
+[6] Source: [Supporting Attitudes on Abortion With the Influence of
+Education and Gender](http://people.oregonstate.edu/~hammerr/soc316/Education_Gender_and_Abortion.pdf)
+
+* * *
+
+## Part 3: Exploratory data analysis
+
+### Data Cleaning and Wrangling
+
+NOTE: Insert code chunks as needed by clicking on the "Insert a new code chunk" 
+button (green button with orange arrow) above. Make sure that your code is visible
+in the project you submit. Delete this note when before you submit your work.
+
+We will start off by isolating the required data to another subset.
+
+``` {r}
+abrtn <- gss %>%
+  select(degree, abdefect, abnomore, abhlth, abpoor, abrape, absingle, abany)
+```
+
+Then, we will look at the amount of empty cells in the subset.
+
+``` {r}
+summary(abrtn)
+```
+
+There are a lot of empty cells within the dataset, but we will not be erasing them for the quality of the data.
+
+We will now be moving on to data analysis, taking note that there are missing datas in most of the columns except the column "sex".
+
+### Data Analysis
+
+First, we will be looking at the educational attainments gotten by different genders.
+
+``` {r}
+ab_count <- abrtn %>%
+  group_by(degree) %>%
+  count(degree)
+
+ggplot(data = na.omit(ab_count), mapping = aes(x = degree, y = n)) +
+  geom_bar(size = 5, stat = "identity", fill = "lightblue") +
+  geom_text(aes(label = n), position = position_dodge(width = 0.9), vjust = -0.25) +
+  ggtitle("Educational Attainment of Genders") +
+  xlab("Educational Attainment") +
+  ylab("Number of Respondents") +
+  scale_fill_manual(values = c("#63C5DA", "#FFB6C1")) +
+  theme_classic()
+```
+
+In the figure above, we can see that there are more female respondents in this survey that has received education or has graduated (except by the graduate degree, where men respondents have it more by a slight margin).
+
+With this in mind, we can continue with analyzing the different scenarios created by the survey for these respondents.
+
+Firstly, we will check if educational attainment has anything to do with their opinions of abortion judging through these scenarios.
+
+``` {r echo = FALSE}
+ab_count <- abrtn %>%
+  group_by(degree, abdefect) %>%
+  count(abdefect)
+
+ggplot(data = na.omit(ab_count), mapping = aes(x = degree, y = n, fill = abdefect)) +
+  geom_bar(position = "dodge", size = 5, stat = "identity") +
+  geom_text(aes(label = n), position = position_dodge(width = 0.9), vjust = -0.25) +
+  guides(fill=guide_legend(title="Opinion")) +
+  ggtitle("Abortion if there is a strong chance of a serious birth defect") +
+  xlab("Educational Attainment") +
+  ylab("Number of Respondents") +
+  scale_fill_manual(values = c("#77DD77", "#FF6961")) +
+  theme_classic()
+```
+
+``` {r echo = FALSE}
+ab_count <- abrtn %>%
+  group_by(degree, abnomore) %>%
+  count(abnomore)
+
+ggplot(data = na.omit(ab_count), mapping = aes(x = degree, y = n, fill = abnomore)) +
+  geom_bar(position = "dodge", size = 5, stat = "identity") +
+  geom_text(aes(label = n), position = position_dodge(width = 0.9), vjust = -0.25) +
+  guides(fill=guide_legend(title="Opinion")) +
+  ggtitle("Abortion if a couple does not want to have more children") +
+  xlab("Educational Attainment") +
+  ylab("Number of Respondents") +
+  scale_fill_manual(values = c("#77DD77", "#FF6961")) +
+  theme_classic()
+```
+
+``` {r echo = FALSE}
+ab_count <- abrtn %>%
+  group_by(degree, abhlth) %>%
+  count(abhlth)
+
+ggplot(data = na.omit(ab_count), mapping = aes(x = degree, y = n, fill = abhlth)) +
+  geom_bar(position = "dodge", size = 5, stat = "identity") +
+  geom_text(aes(label = n), position = position_dodge(width = 0.9), vjust = -0.25) +
+  guides(fill=guide_legend(title="Opinion")) +
+  ggtitle("Abortion if a woman is seriously endangered by the pregnancy") +
+  xlab("Educational Attainment") +
+  ylab("Number of Respondents") +
+  scale_fill_manual(values = c("#77DD77", "#FF6961")) +
+  theme_classic()
+```
+
+``` {r echo = FALSE}
+ab_count <- abrtn %>%
+  group_by(degree, abpoor) %>%
+  count(abpoor)
+
+ggplot(data = na.omit(ab_count), mapping = aes(x = degree, y = n, fill = abpoor)) +
+  geom_bar(position = "dodge", size = 5, stat = "identity") +
+  geom_text(aes(label = n), position = position_dodge(width = 0.9), vjust = -0.25) +
+  guides(fill=guide_legend(title="Opinion")) +
+  ggtitle("Abortion if a couple does not have enough income to raise a kid") +
+  xlab("Educational Attainment") +
+  ylab("Number of Respondents") +
+  scale_fill_manual(values = c("#77DD77", "#FF6961")) +
+  theme_classic()
+```
+
+``` {r echo = FALSE}
+ab_count <- abrtn %>%
+  group_by(degree, abrape) %>%
+  count(abrape)
+
+ggplot(data = na.omit(ab_count), mapping = aes(x = degree, y = n, fill = abrape)) +
+  geom_bar(position = "dodge", size = 5, stat = "identity") +
+  geom_text(aes(label = n), position = position_dodge(width = 0.9), vjust = -0.25) +
+  guides(fill=guide_legend(title="Opinion")) +
+  ggtitle("Abortion if a woman has been pregnant because of rape") +
+  xlab("Educational Attainment") +
+  ylab("Number of Respondents") +
+  scale_fill_manual(values = c("#77DD77", "#FF6961")) +
+  theme_classic()
+```
+
+``` {r echo = FALSE}
+ab_count <- abrtn %>%
+  group_by(degree, absingle) %>%
+  count(absingle)
+
+ggplot(data = na.omit(ab_count), mapping = aes(x = degree, y = n, fill = absingle)) +
+  geom_bar(position = "dodge", size = 5, stat = "identity") +
+  geom_text(aes(label = n), position = position_dodge(width = 0.9), vjust = -0.25) +
+  guides(fill=guide_legend(title="Opinion")) +
+  ggtitle("Abortion if a woman has been pregnant but is also single") +
+  xlab("Educational Attainment") +
+  ylab("Number of Respondents") +
+  scale_fill_manual(values = c("#77DD77", "#FF6961")) +
+  theme_classic()
+```
+
+``` {r echo = FALSE}
+ab_count <- abrtn %>%
+  group_by(degree, abany) %>%
+  count(abany)
+
+ggplot(data = na.omit(ab_count), mapping = aes(x = degree, y = n, fill = abany)) +
+  geom_bar(position = "dodge", size = 5, stat = "identity") +
+  geom_text(aes(label = n), position = position_dodge(width = 0.9), vjust = -0.25) +
+  guides(fill=guide_legend(title="Opinion")) +
+  ggtitle("Abortion if a woman has any reason") +
+  xlab("Educational Attainment") +
+  ylab("Number of Respondents") +
+  scale_fill_manual(values = c("#77DD77", "#FF6961")) +
+  theme_classic()
+```
+
+As we can see from the graphs above, we can see that a lot of people agree to abortion when it comes to a pregnancy with birth defects, a life in danger, or a pregnancy because of rape. Other than that, there are different opinions with regards to abortion. There is a small pattern though. We can see as people go through junior college, there is a change of opinions with abortion, supporting the research paper that there is a positive correlation between a higher educational attainment and opinions.
+
+With this in mind, we may now continue on to making our hypothesis.
+
+* * *
+
+## Part 4: Inference
+
+NOTE: Insert code chunks as needed by clicking on the "Insert a new code chunk" 
+button (green button with orange arrow) above. Make sure that your code is visible
+in the project you submit. Delete this note when before you submit your work.
+
+### Stating of Hypothesis
+
+We start our hypothesis by believing that there is no relationships between educational attainment and opinions of abortion.
+
+$H_{O}: Educational \:Attainment \:and \:Opinions \:of \:Abortion \:are \:independent.$
+$H_{A}: Educational \:Attainment \:and \:Opinions \:of \:Abortion \:are \:dependent.$
+
+With the hypothesis created, we may now look at what test can we use.
+
+### Checking of Conditions and Method to Use
+
+Since we can see that there are a lot of groups in our data, and we are looking for the independence between two variables, we will be using chi-squared test of independence.
+
+These will be the conditions of chi-squared test of independence:
+* There are two categorical variables.
+* Two or more categories (groups) for each variable
+* Independence of observations
+  + No relationships between the subjects of the groups
+  + Categorical variables are not paired in any way.
+* Relatively large sample size.
+  + Expected frequencies to be at least more than 1.
+  * Expected frequencies to be at least more than 5 for the majority of the cells.
+  
+1. We are mostly dealing with a sample size (give or take about 57061) and also, the graphs at the second section are the numbers that we will be applying here. Thus, we can safely say that we satisfy the condition where we need to have at least 1 value for the majority of the cells. 
+2. We are also sure that education attained is not dependent with the opinions of abortion. Thus, we can also say that there is an independence with the variables. 
+3. Finally, since there are more than 2 variables in educational attainment and opinions, we can say that we satisfy both the first and second conditions for chi-squared of independence.
+
+Thus, we can conclude that we can use chi-squared test of independence for this test.
+
+Now, we will list down all of the scenarios listed, then examine them.
+
+### Performing Interference
+
+#### Abortion if there is a strong chance of a serious birth defect
+
+```{r}
+sample <- abrtn %>%
+  select(degree, abdefect)
+
+sample <- na.omit(sample)
+```
+```{r}
+table(sample$abdefect, sample$degree)
+```
+```{r}
+chisq.test(sample$abdefect, sample$degree, correct = FALSE)
+```
+
+#### Abortion if a couple does not want to have more children
+
+```{r}
+sample <- abrtn %>%
+  select(degree, abnomore)
+
+sample <- na.omit(sample)
+```
+
+```{r}
+table(sample$abnomore, sample$degree)
+```
+
+```{r}
+chisq.test(sample$abnomore, sample$degree, correct = FALSE)
+```
+
+#### Abortion if a woman is seriously endangered by the pregnancy
+
+```{r}
+sample <- abrtn %>%
+  select(degree, abhlth)
+
+sample <- na.omit(sample)
+```
+
+```{r}
+table(sample$abhlth, sample$degree)
+```
+
+```{r}
+chisq.test(sample$abhlth, sample$degree, correct = FALSE)
+```
+
+#### Abortion if a couple does not have enough income to raise a kid
+
+```{r}
+sample <- abrtn %>%
+  select(degree, abpoor)
+
+sample <- na.omit(sample)
+```
+
+```{r}
+table(sample$abpoor, sample$degree)
+```
+
+```{r}
+chisq.test(sample$abpoor, sample$degree, correct = FALSE)
+```
+
+#### Abortion if a woman has been pregnant because of rape
+
+```{r}
+sample <- abrtn %>%
+  select(degree, abrape)
+
+sample <- na.omit(sample)
+```
+
+```{r}
+table(sample$abrape, sample$degree)
+```
+
+```{r}
+chisq.test(sample$abrape, sample$degree, correct = FALSE)
+```
+
+#### Abortion if a woman has been pregnant but is also single
+
+```{r}
+sample <- abrtn %>%
+  select(degree, absingle)
+
+sample <- na.omit(sample)
+```
+
+```{r}
+table(sample$absingle, sample$degree)
+```
+
+```{r}
+chisq.test(sample$absingle, sample$degree, correct = FALSE)
+```
+
+#### Abortion if a woman has any reason
+
+```{r}
+sample <- abrtn %>%
+  select(degree, abany)
+
+sample <- na.omit(sample)
+```
+
+```{r}
+table(sample$abany, sample$degree)
+```
+
+```{r}
+chisq.test(sample$abany, sample$degree, correct = FALSE)
+```
+
+After running through the test for different scenarios, we can see that since the $p$-value is less than 5%, we cannot reject the null hypothesis, and thus concluding that there is no correlation between education and opinion with abortion.
+
+### Conclusion
+In the end, this research paper fails to prove that there is a correlation between educational attainment and opinions of abortion. The researcher thinks that there are other factors that may lead up to becoming opinionated with regards to abortion because of religion, personal experiences, and more.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

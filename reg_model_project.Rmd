@@ -1,0 +1,452 @@
+---
+title: "Modeling and prediction for movies"
+output: 
+  html_document: 
+    fig_height: 4
+    highlight: pygments
+    theme: spacelab
+---
+
+## Setup
+
+### Load packages
+
+```{r load-packages, message = FALSE}
+library(ggplot2)
+library(dplyr)
+library(statsr)
+library(GGally)
+```
+
+### Load data
+
+```{r load-data, echo = FALSE}
+load("movies.Rdata")
+predict <- read.csv("https://raw.githubusercontent.com/jchong911/Coursera-Prediction/main/predict.csv?token=AO3ET3XQJAWAJ7FH4Z4JCRS7W5MK2")
+```
+
+
+
+* * *
+
+## Part 1: Data
+
+The data was gotten for Rotten Tomatoes and IMDB APIs. Rotten Tomatoes, together with the Tomatometer is one of the most trusted recommendation resources for movies, shows, podcasts, and more. They are usually scoring the movies through critics and audiences. While critics can rate the movies through Rotten Tomatoes before the movie, audience members can rate the movie once it comes out. Usually the audience rates it out of 100, then the Tomatometer can give an average of what the people like and dislike. IMDB operates similarly to Rotten Tomatoes, but instead they rate out of a possible 5 out of 5.The data is mostly movies that are released before 2016.
+
+* * *
+
+## Part 2: Research question
+
+The official definition of a movie (from Merriam Webster) is a "recording of moving images that tells a story and that people watch on a screen or television ^[1]^." This is a well known fact as some people tend to watch movies as a hobby, especially while the pandemic is still rampant. A lot of people tend to watch movies albeit differently. In a site called Statista, 13% of adults in the US watch a movie in the theaters. Additionally, about 54% of adults watch movies inside the comfort of their own homes ^[2]^. 
+
+With the general statistics, we can safely say that a good majority of US citizens love watching movies. Of course, with movies, there are different genres like "Action and Adventure", "Mystery", "Horror" and more. With this in mind, we see that there are different runtimes with regards to movies. Some tend to be longer than others. Therefore, this really piqued my interest. What is the general runtime of a movie? If we can predict one, what are the variables that we will be looking at for us to accurately predict the runtime of the movie? In this report, we will try to look at the general runtime of the movies inside the database and see what are the average runtime of movies and see if we can accurately predict the different runtimes of the movies.
+
+[1] Source: [Merriam Webster](https://www.merriam-webster.com/dictionary/movie#:~:text=1%20%3A%20a%20recording%20of%20moving,Civil%20War%20an%20action%20movie)
+
+[2] Source: [Statista](https://www.statista.com/statistics/264399/preferred-place-of-movie-consumption-in-the-us/#:~:text=Movie%20viewership,movies%20several%20times%20per%20week.)
+
+* * *
+
+## Part 3: Exploratory data analysis
+
+First, we would like to make another subset of the main dataset, movies.Rdata, in order to manage the variables needed inside the main database. Then, we will see what are the average runtime, audience score, critics score, and imdb score in the dataset.
+
+``` {r}
+database <- movies %>%
+  select(title, runtime, genre, imdb_rating, mpaa_rating, audience_score, audience_rating, critics_score, critics_rating) %>%
+  filter(!(is.na(runtime)))
+
+cols <- c("runtime", "imdb_rating", "audience_score", "critics_score")
+summary(database[cols])
+```
+
+We can see here that most movies run on average 105.8 minutes (~ 1 hour and 45 minutes). We can also see that most IMDB users usually score a movie at around 6.6 out of a possible 10. This is possible since most users in Rotten Tomato also have an average score of 62.35 out of a possible 100. The critics score lower at 57.65 out of a possible 100.
+
+``` {r fig.width = 10, fig.height = 5}
+count <- database %>%
+  group_by(genre) %>%
+  count(genre)
+
+ggplot(count, mapping = aes(x = n, y = reorder(genre, -n), fill = genre)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Number of Movies in a Certain Genre", 
+       caption = "Data from movies.Rdata", 
+       tag = "Figure 1", 
+       x = "Number of Movies",
+       y = "Genre", 
+       fill = "Legend") +
+  theme(legend.position = c(.99, .98), 
+        legend.justification = c("right", "top"),
+        legend.box.just = "right",
+        legend.margin = margin(6, 6, 6, 6), 
+        plot.title = element_text(hjust = 0.5)
+    )
+```
+In the figure above, we can see that there is a huge number of movies that fall into the "Drama" genre, thus this dataset may be biased around the "Drama" category in the idea that predicting data in drama is fairly more accurate than other genres.
+
+We may now look at other variables and explain what do they imply when using these as factors for predicting.
+
+``` {r fig.width = 10, fig.height = 5}
+count <- database %>%
+  group_by(mpaa_rating) %>%
+  count(mpaa_rating)
+
+ggplot(count, mapping = aes(x = n, y = reorder(mpaa_rating, -n), fill = mpaa_rating)) +
+  geom_bar(stat = "identity") +   
+  labs(title = "MPAA Ratings of Movies", 
+       caption = "Data from movies.Rdata", 
+       tag = "Figure 2", 
+       x = "Number of Movies",
+       y = "MPAA Rating", 
+       fill = "Legend") +
+  theme(legend.position = c(.99, .98), 
+        legend.justification = c("right", "top"),
+        legend.box.just = "right",
+        legend.margin = margin(6, 6, 6, 6), 
+        plot.title = element_text(hjust = 0.5)
+    )
+```
+
+Similarly, there are also a large number of movies that are rated "R". It does not look too extreme just like the data in Figure 1, but we also take note of the small number of movies that are rated "NC-17". For movies that are rating "NC-17", these may yield less accurate results if we were to use this as a factor for predicting.
+
+``` {r fig.width = 10, fig.height = 5}
+count <- database %>%
+  group_by(critics_rating) %>%
+  count(critics_rating)
+
+ggplot(count, mapping = aes(x = n, y = reorder(critics_rating, -n), fill = critics_rating)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Ratings of Movies (Critics)", 
+       caption = "Data from movies.Rdata", 
+       tag = "Figure 3", 
+       x = "Number of Movies",
+       y = "Critics Rating", 
+       fill = "Legend") +
+  theme(legend.position = c(.99, .98), 
+        legend.justification = c("right", "top"),
+        legend.box.just = "right",
+        legend.margin = margin(6, 6, 6, 6), 
+        plot.title = element_text(hjust = 0.5)
+    )
+```
+
+In the figure above, we can see that there are a huge number of movies that are rated "Rotten", meaning that the movies are not up to the par with the standards set by the critics themselves. this may be explainable since we know that the mean for the critics' score is at average 57.65.
+
+``` {r fig.width = 10, fig.height = 5}
+count <- database %>%
+  group_by(audience_rating) %>%
+  count(audience_rating)
+
+ggplot(count, mapping = aes(x = n, y = reorder(audience_rating, -n), fill = audience_rating)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Categorical Ratings of Movies (Audience)", 
+       caption = "Data from movies.Rdata", 
+       tag = "Figure 4", 
+       x = "Number of Movies",
+       y = "Audience Rating", 
+       fill = "Legend") +
+  theme(legend.position = c(.99, .98), 
+        legend.justification = c("right", "top"),
+        legend.box.just = "right",
+        legend.margin = margin(6, 6, 6, 6), 
+        plot.title = element_text(hjust = 0.5)
+    )
+```
+
+From the figure above, we can see that there are more movies labeled "Upright" than "Spilled". This info is backed up by the mean of the audience score (62.35). A movie is labeled "Spilled" if the audience score is 60% or lower.
+
+We want to look at the distributions of these movies whether they are normally distributed or not. For this, we will be bringing up the summary table earler, then compare it to the histograms
+
+``` {r echo = FALSE, fig.width = 10, fig.height = 5}
+summary(database["imdb_rating"])
+
+ggplot(database, mapping = aes(x = imdb_rating)) +
+  geom_histogram(color = "#e9ecef") +
+  labs(title = "Ratings of IMDB Users", 
+       caption = "Data from movies.Rdata", 
+       tag = "Figure 5", 
+       x = "Ratings of IMDB Users",
+       y = "Frequency", 
+       fill = "Legend") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+We can see that the distribution of the rating of IMDB Users are mostly left skewed, but has a nearly normal distribution between 5 - 9. This shows that most movies are mostly rated in these ranges. This may be backed by the mean and median of this category. The mean is at 6.492, while the median is at 6.600.
+
+``` {r echo = FALSE, fig.width = 10, fig.height = 5}
+summary(database["audience_score"])
+
+ggplot(database, mapping = aes(x = audience_score)) +
+  geom_histogram(color = "#e9ecef") +
+  labs(title = "Numerical Ratings of Movies (Audience)", 
+       caption = "Data from movies.Rdata", 
+       tag = "Figure 6", 
+       x = "Ratings of Audience",
+       y = "Frequency", 
+       fill = "Legend") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+For this category, we see that there is a similar left skew, though not so distinct like Figure 5. Every range of numbers has been populated from the minimum (11.00) to the maximum (97.00). This may be possible since most people have their own opinions of the movies that matches with other people too.
+
+``` {r echo = FALSE, fig.width = 10, fig.height = 5}
+summary(database["critics_score"])
+
+ggplot(database, mapping = aes(x = critics_score)) +
+  geom_histogram(color = "#e9ecef") +
+  labs(title = "Numerical Ratings of Movies (Critics)", 
+       caption = "Data from movies.Rdata", 
+       tag = "Figure 7", 
+       x = "Ratings of Critics",
+       y = "Frequency", 
+       fill = "Legend") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+For this category, like Figure 6, there is a definite left skew. Though it isn't so obvious since all of the ranges are populated. We can definitely see that critics are harsh when it comes to rating movies, so as expected, there are low values in the histogram.
+
+``` {r echo = FALSE, fig.width = 10, fig.height = 5}
+summary(database["runtime"])
+
+ggplot(database, mapping = aes(x = runtime)) +
+  geom_histogram(color = "#e9ecef") +
+  labs(title = "Runtime of Movies", 
+       caption = "Data from movies.Rdata", 
+       tag = "Figure 8", 
+       x = "Runtime of Movies",
+       y = "Frequency", 
+       fill = "Legend") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+Finally, for the runtime of the movies, we can definitely see that there is right skew, compared to other categories. This is backed from the info that we have in the summary table. We can see that the median of the runtime is about 103 minutes, while the mean is about 105.8 minutes.
+
+With these in mind, we can move on to modeling our data for our predictions. 
+
+* * *
+
+## Part 4: Modeling
+
+Before we model our predictions, we need to know what variables are we using for us to at least pinpoint the best runtime for the movies.
+
+
+```{r fig.width = 12, fig.height= 5}
+model <- lm(runtime ~ genre, data = database)
+summary(model)
+
+ggplot(database, mapping = aes(x = genre, y = runtime)) +
+  geom_jitter() +
+  geom_smooth(method = "lm") +
+  labs(title = "Scatterplot Between Runtime and Genre", 
+       caption = "Data from movies.Rdata", 
+       tag = "Figure 9", 
+       x = "Genre",
+       y = "Runtime", 
+       fill = "Legend") +
+  theme(plot.title = element_text(hjust = 0.5), 
+        axis.text.x = element_text(angle = 60, hjust = 1))
+```
+
+Starting from the graph, we can see that there is no linear correlation between genre and runtime, but the adjusted R squared says otherwise. We can see that the adjusted R squared of this category is at 10%, making this one deciding factor of runtime. This may be true since there are movies that take longer than usual for the story to buildup and conclude.
+
+```{r fig.width = 12, fig.height= 5}
+model <- lm(runtime ~ imdb_rating, data = database)
+summary(model)
+
+ggplot(database, mapping = aes(x = imdb_rating, y = runtime)) +
+  geom_jitter() +
+  geom_smooth(method = "lm") +   
+  labs(title = "Scatterplot Between Runtime and IMDB Rating", 
+       caption = "Data from movies.Rdata", 
+       tag = "Figure 10", 
+       x = "IMDB Rating",
+       y = "Runtime", 
+       fill = "Legend") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+In this category, we see that there is a slight positive collinear relationship between runtime and imdb rating. The intercept of this is ar 74.61 with a slope of 4.81. This may also be used as one of our predictors.
+
+```{r fig.width = 12, fig.height= 5}
+
+model <- lm(runtime ~ mpaa_rating, data = database)
+summary(model)
+
+ggplot(database, mapping = aes(x = mpaa_rating, y = runtime)) +
+  geom_jitter() +
+  geom_smooth(method = "lm") +   
+  labs(title = "Scatterplot Between Runtime and MPAA Rating", 
+       caption = "Data from movies.Rdata", 
+       tag = "Figure 11", 
+       x = "MPAA Rating",
+       y = "Runtime", 
+       fill = "Legend") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+Same with Figure 9, there is no linear correlation with runtime and MPAA ratings. It's understandable since there are too many differences between the different categories. Comparing this with genre, the adjusted R squared of this isn't really high, though the p value of some of the values in this category is noticably small. Therefore, we can use this as one of our predictors. 
+
+```{r fig.width = 12, fig.height= 5}
+model <- lm(runtime ~ audience_score, data = database)
+summary(model)
+
+ggplot(database, mapping = aes(x = audience_score, y = runtime)) +
+  geom_jitter() +
+  geom_smooth(method = "lm") +   
+  labs(title = "Scatterplot Between Runtime and Numerical Ratings of Audience", 
+       caption = "Data from movies.Rdata", 
+       tag = "Figure 12", 
+       x = "Numerical Ratings of Audience",
+       y = "Runtime", 
+       fill = "Legend") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+Same as Figure 10, there is some collinear relationship between runtime and the ratings of audience. Looking at the adjusted R squared, genre still has the highest R coefficient, but the p value is still significantly low, therefore, we can use this as our predictors.
+
+```{r fig.width = 12, fig.height= 5}
+model <- lm(runtime ~ critics_rating, data = database)
+summary(model)
+
+ggplot(database, mapping = aes(x = critics_rating, y = runtime)) +
+  geom_jitter() +
+  geom_smooth(method = "lm") +   
+  labs(title = "Scatterplot Between Runtime and Categorical Ratings of Critics", 
+       caption = "Data from movies.Rdata", 
+       tag = "Figure 13", 
+       x = "Categorical Ratings of Critics",
+       y = "Runtime", 
+       fill = "Legend") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+Just like Figures 9 and 11, there is no collinear relationship between ratings of critics and runtime, and also the adjusted R squared is lower than genre. P value is still significantly lower, so we will still be adding this to our predictors.
+
+We may look at other variables, but once we mash them into one graph, the graph looks messy, so we suggested that we separate the important variables with the others so that we can see how they relate with each other.\
+
+With this in mind, we used forward regression using R squared to have a more predictive power over the runtime of the movie. After some tries, we came out with this model.
+
+``` {r}
+model <- lm(runtime ~ genre + imdb_rating + mpaa_rating + audience_score + critics_rating, data = movies)
+summary(model)
+```
+
+As seen from above, we can see that our intercept is at 52.12723 using genre: Animation as the intercept following with different ranging slopes. Let's dissect these by their variables. 
+- For genre, we can see that most of them have negative variables except Drama, Musical & Performance Art, Mystery & Suspense, and Others.
+- Next, IMDB rating has a positive slope, as mirrored in the graph above. We also see that all of MPAA rating values has a positive slope with different heights.
+- With audience score, we see that there is a negative slope.
+- Finally, critics rating has a 0 to -2 slope.
+
+``` {r}
+plot(model$residuals ~ database$imdb_rating)
+abline(h = 0)
+```
+``` {r}
+plot(model$residuals ~ database$audience_score)
+abline(h = 0)
+```
+
+``` {r}
+plot(model$residuals ~ database$genre)
+abline(h = 0)
+```
+
+``` {r}
+plot(model$residuals ~ database$mpaa_rating)
+abline(h = 0)
+```
+
+``` {r}
+plot(model$residuals ~ database$critics_rating)
+abline(h = 0)
+```
+
+With the model in mind, we can look and see the graph of residuals for this model. We can see that most vales are scattered, but close to zero as expected.
+
+Now we can try to predict and see if the predictions are correct.
+
+* * *
+
+## Part 5: Prediction
+
+We started off by making a small dataset of 10 movies that we got from the Top 10 Rotten Tomatoes movies list. With that, we may calculate the predictions and see what these predictions together with their residuals.
+
+``` {r}
+predict$predictions <- round(predict(model, predict), digits = 0)
+predict$residuals <- predict$runtime - predict$predictions
+predict %>% select(title, genre, runtime, predictions, residuals)
+```
+
+For our predictions, we can see that there are some that missed the mark such as "The Irishman" who has a different runtime since the movie is about 209 minutes long. Thus, there is a residual of 92 minutes. Also, "Avengers: Endgame" is also a very long movie, ranging in at 181 minutes, and thus this model has a residual of 57 minutes. Other than those 2 residuals, we can see that there is a very low residual that ranges from -1 to 29.
+
+We can look at these predictions and see it in a 95% interval.
+
+``` {r echo = FALSE, message = FALSE}
+movie1 <- predict[1,]
+movie2 <- predict[2,]
+movie3 <- predict[3,]
+movie4 <- predict[4,]
+movie5 <- predict[5,]
+movie6 <- predict[6,]
+movie7 <- predict[7,]
+movie8 <- predict[8,]
+movie9 <- predict[9,]
+movie10 <- predict[10,]
+
+predict(model, movie1, interval = "prediction", level = 0.95)
+predict(model, movie2, interval = "prediction", level = 0.95)
+predict(model, movie3, interval = "prediction", level = 0.95)
+predict(model, movie4, interval = "prediction", level = 0.95)
+predict(model, movie5, interval = "prediction", level = 0.95)
+predict(model, movie6, interval = "prediction", level = 0.95)
+predict(model, movie7, interval = "prediction", level = 0.95)
+predict(model, movie8, interval = "prediction", level = 0.95)
+predict(model, movie9, interval = "prediction", level = 0.95)
+predict(model, movie10, interval = "prediction", level = 0.95)
+```
+
+We can see that the model guessed the runtimes of the movies of at least 95% intervals.
+
+* * *
+
+## Part 6: Conclusion
+
+In the end, we can see the negative and positive effects of a longer runtime. 
+1. We can see for different genres except Drama, Musical & Performance Art, Mystery & Suspense, and Others, there is a negative relationship, meaning that the longer the runtime, the less likely that it is of a certain genre. 
+2. Same goes with audience score since the longer the runtime, the lower the score is since the audience gets more bored as the story stretches too much. 
+3. Also, the critics may back it up since they have standards as to what the movie should have to be a blockbuster. 
+4. On the other hand, the longer the movie is, the higher the IMDB rating, indicating that users in IMDB tends to like longer movies and thus giving them higher scores for movies with longer runtimes.
+5. Also, with MPAA ratings, we could see that this certain category has a positive effect on the model, indicating that people in different ages may like longer movies, though there is a certain balance with ratings.
+
+This model though may be inaccurate as we see that there will be different biases such as the lack of PG-17 movies, or the unbalanced data inside the genre. What we can do in the future is to get:
+1. A bigger sample size, so that there is a possibility of choosing more data from different movies.
+2. Different genres, since a movie isn't just a certain genre only. A movie may have different genres such as "Avengers; Endgame". This movie may be labeled as sci-fi, but it can also be labeled as action and adventure. So, we believe to make this data more accurate, more data about the different genres a movie has is better.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
